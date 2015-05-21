@@ -3,7 +3,7 @@ MaNGOS One Changelog
 This change log references the relevant changes (bug and security fixes) done
 in recent versions.
 
-0.20 (2015-02-31) - Points of departure
+0.20 (2015-05-21) - Points of departure
 ---------------------------------------
 Many Thanks to all the groups and individuals who contributed to this release.
 
