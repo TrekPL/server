@@ -57,30 +57,31 @@
  * care of what needs to be done by giving back a \ref GMTicket. The database table interesting
  * in this case is character_ticket in the characaters database.
  *
- * Theres also some handling of tickets in \ref ChatHandler::HandleTicketAcceptCommand where
+ * Theres also some handling of tickets in \ref ChatHandler::HandleTicketCommand where
  * you can turn on/off accepting tickets with your current GM char. You can also turn
  * off tickets globally, this will show the client a message about tickets not being
  * available at the moment. The commands that can be used are:
  * <dl>
- * <dt>.ticket meaccept on/off</dt>
+ * <dt>.ticket on/off</dt>
  * <dd>Turns on/off showing new incoming tickets for you character</dd>
- * <dt>.ticket accept on/off</dt>
+ * <dt>.ticket system_on/off</dt>
  * <dd>Will turn the whole ticket reporting system on/off, ie: if it's off the clients
  * will get a message that the system is unavailable when trying to submit a ticket</dd>
  * <dt>.ticket close $character_name/.ticket close #num_of_ticket</dt>
  * <dd>Will close a ticket for the given character name or the given number of the ticket,
  * this will make the little icon in the top right go away for the player</dd>
- * <dt>.ticket surveyclose $character_name/.ticket surveyclose #num_of_ticket</dt>
+ * <dt>.ticket close_survey $character_name/.ticket close_survey #num_of_ticket</dt>
  * <dd>Does the same as .ticket close but instead of just closing it it also asks the \ref Player
  * to answer a survey about how please they were with the experience</dd>
  * <dt>.ticket respond $character_name/.ticket respond #num_of_ticket</dt>
  * <dd>Will respond to a ticket, this will whisper the \ref Player who asked the question and from
  * there on you will have to explain the solution etc. and then close the ticket again.</dd>
- * <dt>.ticket info</dt>
+ * <dt>.ticket</dt>
  * <dd>Shows the number of currently active tickets</dd>
- * <dt>.ticket show $character_name/.ticket show #num_of_ticket</dt>
+ * <dt>.ticket $character_name/.ticket #num_of_ticket</dt>
  * <dd>Will show the question and name of the character for the given ticket</dd>
  *
+ * \todo Do not remove tickets from db when closing but mark them as solved instead.
  * \todo Log conversations between GM and the player receiving help.
  */
 class GMTicket
@@ -143,7 +144,7 @@ class GMTicket
          * \deprecated
          * \todo Change to resolved/not resolved instead, via the check in db
          */
-        bool HasResponse() { return !m_responseText.empty(); }
+        bool HasResponse() { return !m_responseText.empty(); };
         
         /** 
          * This will take care of a \ref OpcodesList::CMSG_GMSURVEY_SUBMIT packet
@@ -178,7 +179,7 @@ class GMTicket
         time_t m_lastUpdate;
 };
 typedef std::map<ObjectGuid, GMTicket> GMTicketMap;
-typedef std::map<uint32, GMTicket*> GMTicketIdMap;                  // for creating order access
+typedef std::list<GMTicket*> GMTicketList;                  // for creating order access
 
 class GMTicketMgr
 {
@@ -197,15 +198,7 @@ class GMTicketMgr
                 { return NULL; }
             return &(itr->second);
         }
-
-        GMTicket* GetGMTicket(uint32 id)
-        {
-            GMTicketIdMap::iterator itr = m_GMTicketIdMap.find(id);
-            if (itr == m_GMTicketIdMap.end())
-                return NULL;
-            return itr->second;
-        }
-
+        
         size_t GetTicketCount() const
         {
             return m_GMTicketMap.size();
@@ -216,11 +209,11 @@ class GMTicketMgr
             if (pos >= GetTicketCount())
                 { return NULL; }
 
-            GMTicketMap::iterator itr = m_GMTicketMap.begin();
+            GMTicketList::iterator itr = m_GMTicketListByCreatingOrder.begin();
             std::advance(itr, pos);
-            if (itr == m_GMTicketMap.end())
+            if (itr == m_GMTicketListByCreatingOrder.end())
                 { return NULL; }
-            return &(itr->second);
+            return *itr;
         }
 
         /** 
@@ -236,7 +229,7 @@ class GMTicketMgr
             GMTicketMap::iterator itr = m_GMTicketMap.find(guid);
             if (itr == m_GMTicketMap.end())
                 { return; }
-            m_GMTicketIdMap.erase(itr->second.GetId());
+            m_GMTicketListByCreatingOrder.remove(&itr->second);
             m_GMTicketMap.erase(itr);
         }
 
@@ -262,17 +255,17 @@ class GMTicketMgr
          * file a ticket.
          * @param accept true means that we accept tickets, false means that we don't
          */
-        void SetAcceptTickets(bool accept) { m_TicketSystemOn = accept; }
+        void SetAcceptTickets(bool accept) { m_TicketSystemOn = accept; };
         /** 
          * Checks if we accept tickets globally (see \ref GMTicketMgr::SetAcceptTickets)
          * @return true if we are accepting tickets globally, false otherwise
          * \todo Perhaps rename to IsAcceptingTickets?
          */
-        bool WillAcceptTickets() { return m_TicketSystemOn; }
+        bool WillAcceptTickets() { return m_TicketSystemOn; };
     private:
         bool m_TicketSystemOn;
         GMTicketMap m_GMTicketMap;
-        GMTicketIdMap m_GMTicketIdMap;
+        GMTicketList m_GMTicketListByCreatingOrder;
 };
 
 #define sTicketMgr MaNGOS::Singleton<GMTicketMgr>::Instance()
